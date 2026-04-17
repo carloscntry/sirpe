@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python local server / cache
+__pycache__/
+*.pyc
+
+# Environment / secrets
+.env
+.env.*
+config.local.js
+
+# Backups / archives
+*.zip
+*.rar
+*.7z
+
+# Generated docs or exports
+*.pdf
+*.csv
+exports/
+
+# Temporary data
+tmp/
+cache/
