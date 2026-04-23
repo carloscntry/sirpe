@@ -1,0 +1,5 @@
+Reemplaza tu archivo frontend/js/auth-api.js por js/auth-api.js de este ZIP.
+Luego ejecuta en tu repo frontend:
+git add .
+git commit -m "fix: conectar frontend con backend render"
+git push
