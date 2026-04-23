@@ -2,12 +2,14 @@
 const state = {
   incidents: [], sectors: [], hotspots: [], deployments: [], routes: [], summary: [], alerts: [], aiRecs: [],
   staticPosts: [], voronoiCells: [], backendZones: [],
-  map:null, sectorLayer:null, hotspotLayer:null, routeLayer:null, markerLayer:null, simLayer:null, voronoiLayer:null, staticPostLayer:null, apiZoneLayer:null,
+  map:null, sectorLayer:null, hotspotLayer:null, routeLayer:null, markerLayer:null, simLayer:null, voronoiLayer:null, staticPostLayer:null, apiZoneLayer:null, scopePreviewLayer:null, zoneStatusLegend:null,
   simIndex:0, simTimer:null, simRunning:false, simRoutes:[], simMarkers:{},
   currentQr:null, currentQrUrl:null, currentQrName:null,
   apiBaseUrl:'http://127.0.0.1:8000',
   authToken:'', currentUser:null, authProfile:null,
-  folio:'', operator:'', operatorRole:'', accessLevel:'', processDate:''
+  folio:'', operator:'', operatorRole:'', accessLevel:'', processDate:'',
+  currentScope:'municipio',
+  resourceStoreByScope:{ municipio:null, estado:null }
 };
 
 function nowStamp(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }

@@ -1,10 +1,39 @@
 // ================= INGESTA =================
 async function readExcel(file){
-  const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{defval:null});
-  return rows.map(r=>{ const lat=Number(r.Latitud ?? r.lat ?? r.LATITUD); const lon=Number(r.Longitud ?? r.lon ?? r.LONGITUD); const hora=parseHoraToHour(r.HORA ?? r.Hora ?? r.hora); const fecha=r.Fecha?new Date(r.Fecha):null; return {...r,lat,lon,hora,turno:getTurno(hora),fecha,colonia:r.Colonia??r.colonia??'SIN_DATO',municipio:r.Municipio??r.municipio??''}; }).filter(r=>Number.isFinite(r.lat)&&Number.isFinite(r.lon)&&r.lat>18.8&&r.lat<19.3&&r.lon<-98.0&&r.lon>-98.4);
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:null});
+  const scope=getActiveScope();
+  const bounds=getActiveScopeBounds();
+  return rows.map(r=>{
+    const lat=Number(r.Latitud ?? r.lat ?? r.LATITUD);
+    const lon=Number(r.Longitud ?? r.lon ?? r.LONGITUD);
+    const hora=parseHoraToHour(r.HORA ?? r.Hora ?? r.hora);
+    const fecha=r.Fecha?new Date(r.Fecha):null;
+    return {...r,lat,lon,hora,turno:getTurno(hora),fecha,colonia:r.Colonia??r.colonia??'SIN_DATO',municipio:r.Municipio??r.municipio??''};
+  }).filter(r=>{
+    if(!(Number.isFinite(r.lat)&&Number.isFinite(r.lon))) return false;
+    if(scope==='estado' && bounds) return r.lat>bounds.minLat && r.lat<bounds.maxLat && r.lon>bounds.minLon && r.lon<bounds.maxLon;
+    return r.lat>18.8&&r.lat<19.3&&r.lon<-98.0&&r.lon>-98.4;
+  });
 }
 
 const ZONE_CANONICAL_ORDER = ['ZONA 1','ZONA 2','ZONA 3','ZONA 4','ZONA 5','ZONA 6','ZONA 7','ZONA 8','ZONA 9','ZONA 10','ZONA CH'];
+
+function getActiveScope(){
+  return state?.currentScope || document.getElementById('scopeSelector')?.value || 'municipio';
+}
+function getActiveScopeBounds(){
+  if(getActiveScope()==='estado' && typeof ESTADO_SCOPE_BOUNDS!=='undefined') return ESTADO_SCOPE_BOUNDS;
+  return null;
+}
+function getActiveZoneCanonicalOrder(){
+  if(getActiveScope()==='estado' && typeof ESTADO_ZONE_CANONICAL_ORDER!=='undefined' && ESTADO_ZONE_CANONICAL_ORDER?.length){
+    return ESTADO_ZONE_CANONICAL_ORDER.slice();
+  }
+  return ZONE_CANONICAL_ORDER.slice();
+}
 
 function buildZoneAliasMap(){
   const aliases = new Map();
@@ -40,6 +69,12 @@ function sanitizeZoneToken(value){
 function normalizeZoneName(name){
   const raw = sanitizeZoneToken(name);
   if(!raw) return null;
+  if(getActiveScope()==='estado'){
+    if(typeof ESTADO_ZONE_NAME_MAP!=='undefined' && ESTADO_ZONE_NAME_MAP?.[raw]) return ESTADO_ZONE_NAME_MAP[raw];
+    const match = raw.match(/REGION\s*(\d+)/);
+    if(match) return `REGION ${parseInt(match[1],10)}`;
+    return String(name ?? '').trim() || raw;
+  }
   if(ZONE_ALIAS_MAP.has(raw)) return ZONE_ALIAS_MAP.get(raw);
   const mZona = raw.match(/(?:^|\s)ZONA\s*(\d+)(?:\s|$)/) || raw.match(/^(\d+)$/);
   if(mZona){
@@ -86,42 +121,21 @@ function buildZoneCatalog(...collections){
   });
   const catalog = Array.from(set);
   const ordered = [];
-  ZONE_CANONICAL_ORDER.forEach(z=>{ if(catalog.includes(z)) ordered.push(z); });
+  getActiveZoneCanonicalOrder().forEach(z=>{ if(catalog.includes(z)) ordered.push(z); });
   catalog.filter(z=>!ordered.includes(z)).sort((a,b)=>zoneSortValue(a)-zoneSortValue(b)).forEach(z=>ordered.push(z));
   return ordered;
 }
 function getBackendZoneFeatures(){
-  return (state.backendZones||[])
-    .filter(z=>z && z.geometry_geojson && (z.geometry_geojson.type==='Polygon' || z.geometry_geojson.type==='MultiPolygon'))
-    .map(z=>({
-      type:'Feature',
-      properties:{
-        ...(z.properties||{}),
-        id: z.id ?? z.id_zona ?? null,
-        nombre: normalizeZoneName(z.nombre || z.name) || z.nombre || z.name,
-        name: normalizeZoneName(z.nombre || z.name) || z.nombre || z.name,
-        zona: normalizeZoneName(z.nombre || z.name) || z.nombre || z.name,
-        zona_label: normalizeZoneName(z.nombre || z.name) || z.nombre || z.name,
-        tipo: z.tipo || 'Zona API',
-        nivel_riesgo: z.nivel_riesgo || 'Medio',
-        source_layer: 'FASTAPI_ZONAS'
-      },
-      geometry: z.geometry_geojson
-    }));
+  return [];
 }
 function getModelZoneFeatures(preferBackend=true){
-  const backend = getBackendZoneFeatures();
-  if(preferBackend && backend.length) return backend;
-  return (state.sectors||[]).filter(f=>f?.geometry);
+  if(getActiveScope()==='estado' && typeof ESTADO_SECTOR_FEATURES!=='undefined' && ESTADO_SECTOR_FEATURES?.length){
+    return JSON.parse(JSON.stringify(ESTADO_SECTOR_FEATURES));
+  }
+  return defaultSectorFeatures();
 }
 function getModelZoneCatalog(resourcesObj){
-  const backendNames = (state.backendZones||[])
-    .map(z=>normalizeZoneName(z.nombre || z.name || z.zona))
-    .filter(Boolean);
-  if(backendNames.length){
-    return buildZoneCatalog(backendNames, Object.keys(resourcesObj||{}));
-  }
-  return buildZoneCatalog(state.sectors||[], state.vectors||[], Object.keys(resourcesObj||{}), state.backendZones||[]);
+  return buildZoneCatalog(state.sectors||[], state.vectors||[], Object.keys(resourcesObj||{}), []);
 }
 
 async function readGeoJsonFiles(fileList, fallbackFeatures=[]){
@@ -145,20 +159,13 @@ async function readGeoJsonFiles(fileList, fallbackFeatures=[]){
 
 function syncResourceTextarea(resources){
   const ordered = {};
-  FIXED_RESOURCE_ZONES.forEach(z=>{
+  const activeZones = (typeof getFixedResourceZones==='function') ? getFixedResourceZones() : ((typeof getActiveZoneCanonicalOrder==='function') ? getActiveZoneCanonicalOrder() : []);
+  activeZones.forEach(z=>{
     const nz = normalizeZoneName(z);
     ordered[nz] = resources[nz] || {"unidades":0,"elementos":0};
   });
   const box = document.getElementById('resourceJson');
   if(box) box.value = JSON.stringify(ordered, null, 2);
-
-  const rows = document.querySelectorAll('#resourceRows .resource-input');
-  rows.forEach(inp=>{
-    const zone = normalizeZoneName(inp.dataset.zone);
-    const field = inp.dataset.field;
-    const val = Number(ordered[zone]?.[field] || 0);
-    if(String(inp.value) != String(val)) inp.value = val;
-  });
 }
 function ensureResourceCoverage(resources, hotspots, minElem){
   const out = JSON.parse(JSON.stringify(resources||{}));
@@ -271,17 +278,10 @@ function assignElements(totalE,totalU,minE,maxE){
 function nearestNeighbor(points){ if(points.length<=1) return points.slice(); const pool=points.slice().sort((a,b)=>b.probabilidad-a.probabilidad); const route=[pool.shift()]; while(pool.length){ const last=route[route.length-1]; let bestIdx=0,bestD=Infinity; pool.forEach((p,idx)=>{ const d=haversineKm(last.lat,last.lon,p.lat,p.lon); if(d<bestD){bestD=d;bestIdx=idx;} }); route.push(pool.splice(bestIdx,1)[0]); } return route; }
 function makeGoogleMapsUrl(points){ if(!points.length) return ''; const origin=`${points[0].lat},${points[0].lon}`; const dest=`${points[points.length-1].lat},${points[points.length-1].lon}`; const inner=points.slice(1,-1).map(p=>`${p.lat},${p.lon}`).join('|'); let url=`https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`; if(inner) url+=`&waypoints=${encodeURIComponent(inner)}`; return url; }
 function routeStatus(tMin, risk, nWp){ if((Number(nWp)||0)<=1) return {label:'Punto fijo', cls:'info'}; if(tMin>90) return {label:'Crítica', cls:'danger'}; if(tMin>60 || risk<1.2) return {label:'Atención', cls:'warn'}; return {label:'Óptima', cls:'ok'}; }
-function clearLayers(){ [state.sectorLayer,state.vectorLayer,state.hotspotLayer,state.routeLayer,state.markerLayer,state.simLayer,state.voronoiLayer,state.staticPostLayer].forEach(l=>{ if(l) state.map.removeLayer(l); }); }
-function featureVerticesKmDistance(point, feature){
-  let maxKm = 0;
-  try{
-    const coords = turf.coordAll(feature);
-    coords.forEach(c=>{
-      const d = haversineKm(point.geometry.coordinates[1], point.geometry.coordinates[0], c[1], c[0]);
-      if(d > maxKm) maxKm = d;
-    });
-  }catch(e){}
-  return maxKm;
+function clearLayers(){
+  [state.scopePreviewLayer,state.sectorLayer,state.vectorLayer,state.hotspotLayer,state.routeLayer,state.markerLayer,state.simLayer,state.voronoiLayer,state.staticPostLayer,state.apiZoneLayer].forEach(l=>{ if(l && state.map) state.map.removeLayer(l); });
+  state.scopePreviewLayer=null; state.sectorLayer=null; state.vectorLayer=null; state.hotspotLayer=null; state.routeLayer=null; state.markerLayer=null; state.simLayer=null; state.voronoiLayer=null; state.staticPostLayer=null; state.apiZoneLayer=null;
+  if(state.zoneStatusLegend && state.map){ try{ state.map.removeControl(state.zoneStatusLegend); }catch(e){} state.zoneStatusLegend=null; }
 }
 
 function renderChart(){ const chartEl=document.getElementById('turnoChart'); if(!chartEl || !window.Plotly) return; const byTurno={}; state.summary.forEach(r=>byTurno[r.turno]=(byTurno[r.turno]||0)+1); Plotly.newPlot('turnoChart',[{type:'bar',x:Object.keys(byTurno),y:Object.values(byTurno),text:Object.values(byTurno),textposition:'auto',marker:{color:'#113a6b'}}],{paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{color:'#1f2937'},margin:{l:40,r:10,t:20,b:40},yaxis:{title:'Unidades'},xaxis:{title:'Turno'}},{displayModeBar:false,responsive:true}); }

@@ -689,6 +689,128 @@
       font-weight:700;
     }
 
+
+    .kpi-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(160px,1fr));
+      gap:12px;
+      margin:0 0 16px;
+    }
+    .kpi-card{
+      background:linear-gradient(135deg, rgba(10,28,45,.98), rgba(17,58,107,.94));
+      color:#fff;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:16px 18px;
+      box-shadow:0 14px 28px rgba(8,22,36,.18);
+    }
+    .kpi-label{
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      color:rgba(230,242,251,.78);
+    }
+    .kpi-value{
+      font-size:30px;
+      font-weight:800;
+      line-height:1.1;
+      margin-top:8px;
+      color:#fff;
+    }
+    .kpi-sub{
+      margin-top:6px;
+      font-size:12px;
+      color:rgba(230,242,251,.76);
+      font-weight:700;
+    }
+    @media (max-width:1200px){
+      .kpi-grid{grid-template-columns:repeat(2,minmax(160px,1fr));}
+    }
+    @media (max-width:720px){
+      .kpi-grid{grid-template-columns:1fr;}
+      .kpi-value{font-size:26px;}
+    }
+
+
+    .command-panel{
+      margin:0 0 16px;
+      background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,250,253,.98));
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow-soft);
+      overflow:hidden;
+    }
+    .command-panel-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:16px 18px;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg,#fbfdff,#f5f9fc);
+    }
+    .command-panel-head h3{margin:0}
+    .command-panel-body{padding:14px 16px 16px}
+    .command-actions{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(240px,1fr));
+      gap:10px;
+    }
+    .command-action{
+      border:1px solid var(--line);
+      border-left:4px solid var(--accent);
+      border-radius:14px;
+      background:#fff;
+      padding:12px 12px 12px 14px;
+      box-shadow:var(--shadow-soft);
+    }
+    .command-action.critical{border-left-color:var(--danger)}
+    .command-action.warn{border-left-color:var(--warn)}
+    .command-action.info{border-left-color:#1e5b94}
+    .command-action .title{
+      font-size:13px;
+      font-weight:800;
+      color:var(--accent);
+      margin-bottom:4px;
+    }
+    .command-action .desc{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.45;
+      font-weight:700;
+    }
+    .command-empty{
+      padding:12px;
+      border:1px dashed var(--line-strong);
+      border-radius:12px;
+      background:#fbfdff;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+    }
+    @media (max-width:900px){
+      .command-actions{grid-template-columns:1fr;}
+    }
+
+
+    .scope-selector-wrap{margin-bottom:12px}
+    .scope-selector-wrap select{font-weight:700}
+    .scope-note{font-size:12px;color:var(--muted);margin-top:6px;font-weight:700}
+
+    .scope-active-badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 12px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;font-size:12px;font-weight:800;letter-spacing:.04em;
+      white-space:nowrap;
+    }
+    .scope-active-badge .dot{
+      width:10px;height:10px;border-radius:50%;display:inline-block;
+      background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15);
+    }
+
 </style>
 
 
@@ -743,6 +865,15 @@
         </button>
       </div>
       <div class="sidebar-section-body" id="archivosSectionBody">
+        
+        <div class="scope-selector-wrap">
+          <label>Ámbito geográfico</label>
+          <select id="scopeSelector">
+            <option value="municipio" selected>Municipio de Puebla</option>
+            <option value="estado">Estado de Puebla</option>
+          </select>
+          <div class="scope-note">La lógica operativa se mantiene. Solo cambia la capa geográfica activa.</div>
+        </div>
         <div class="field"><label>Excel de homicidios (.xlsx)</label><input type="file" id="excelFile" accept=".xlsx,.xls"></div>
       </div>
     </section>
@@ -876,7 +1007,7 @@
         <div class="hero-status"><span class="live-dot"></span><span>Monitoreo activo</span></div>
         <div id="sessionStrip" class="session-strip"></div>
         <div class="hero-actions">
-          <button id="refreshZonesBtn" class="secondary">Actualizar zonas API</button>
+          <button id="refreshZonesBtn" class="secondary" style="display:none">Actualizar zonas</button>
           <button id="logoutBtn" class="secondary">Cerrar sesión</button>
         </div>
         <div class="hero-badges" id="heroBadges"></div>
@@ -888,19 +1019,57 @@
     <div id="backendZonesPanel" class="panel simple-collapsible">
       <button type="button" class="collapse-toggle" id="backendZonesToggle" aria-expanded="false" aria-controls="backendZonesCollapse">
         <div>
-          <div class="panel-kicker">Integración backend</div>
-          <h3>Zonas cargadas desde FastAPI</h3>
+          <div class="panel-kicker">Fuente geográfica</div>
+          <h3>Zonas cargadas desde archivos locales</h3>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="zone-api-meta">
             <span id="zonesApiCount" class="pill">0 zonas</span>
-            <span id="zonesApiStatus" class="pill warn">Sin sincronizar</span>
+            <span id="zonesApiStatus" class="pill warn">Fuente local</span>
           </div>
           <span class="collapse-icon">▶</span>
         </div>
       </button>
       <div id="backendZonesCollapse" class="collapse-content" hidden>
         <div class="table-wrap"><table id="backendZonesTable"></table></div>
+      </div>
+    </div>
+
+    
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Zonas críticas</div>
+        <div id="kpiCritical" class="kpi-value">0</div>
+        <div class="kpi-sub">Resumen operativo actual</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Cobertura</div>
+        <div id="kpiCoverage" class="kpi-value">0%</div>
+        <div class="kpi-sub">Zonas en estado óptimo</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Unidades desplegadas</div>
+        <div id="kpiUnits" class="kpi-value">0</div>
+        <div class="kpi-sub">Rutas y puntos fijos activos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Alertas activas</div>
+        <div id="kpiAlerts" class="kpi-value">0</div>
+        <div class="kpi-sub">Incidencias por atención</div>
+      </div>
+    </div>
+
+    
+    <div class="command-panel">
+      <div class="command-panel-head">
+        <div>
+          <div class="panel-kicker">Centro de mando</div>
+          <h3>Acciones sugeridas</h3>
+        </div>
+        <span class="pill info">Prioridad operativa</span>
+      </div>
+      <div class="command-panel-body">
+        <div id="commandActions" class="command-empty">Procesa un escenario para generar acciones sugeridas.</div>
       </div>
     </div>
 
@@ -1088,6 +1257,8 @@
 
 
 <script src="js/state.js"></script>
+<script src="js/municipio-zonas.js"></script>
+<script src="js/estado-regiones.js"></script>
 <script src="js/auth-api.js"></script>
 <script src="js/ingesta.js"></script>
 <script src="js/export.js"></script>

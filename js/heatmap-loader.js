@@ -1,4 +1,43 @@
 (function(){
+
+  window.updateActiveScopeBadge = function(){
+    const badge = document.getElementById('scopeActiveBadge');
+    if(!badge) return;
+    const scope = document.getElementById('scopeSelector')?.value || state.currentScope || 'municipio';
+    const label = scope === 'estado' ? 'Estado de Puebla' : 'Municipio de Puebla';
+    const dotColor = scope === 'estado' ? '#60a5fa' : '#4ade80';
+    const shadow = scope === 'estado' ? 'rgba(96,165,250,.15)' : 'rgba(74,222,128,.15)';
+    badge.innerHTML = `<span class="dot" style="background:${dotColor}; box-shadow:0 0 0 4px ${shadow};"></span><span>Ámbito activo: ${label}</span>`;
+  };
+
+
+
+  window.applyScopeVisualMode = function(redrawOnly=false){
+    state.currentScope = document.getElementById('scopeSelector')?.value || state.currentScope || 'municipio';
+    if(!redrawOnly){
+      state.summary = [];
+      state.routes = [];
+      state.hotspots = [];
+      state.incidents = [];
+      state.deployments = [];
+      state.voronoiCells = [];
+      state.staticPosts = [];
+    }
+    state.vectors = state.currentScope === 'estado' ? [] : (typeof defaultVectorFeatures==='function' ? defaultVectorFeatures() : []);
+    state.sectors = (typeof getModelZoneFeatures==='function') ? getModelZoneFeatures(false) : (state.sectors || []);
+    if(typeof renderFixedResourceModule==='function'){
+      renderFixedResourceModule(typeof getStoredResourcesForScope==='function' ? getStoredResourcesForScope(getScopeKey()) : getDefaultResourceMap());
+    }
+    if(typeof getModelZoneCatalog==='function'){
+      state.zoneCatalog = getModelZoneCatalog(typeof getResourcesFromUI==='function' ? getResourcesFromUI() : {});
+    }
+    if(typeof buildZoneColorMap==='function') buildZoneColorMap();
+    if(state.map && typeof drawMap==='function' && Array.isArray(state.sectors) && state.sectors.length){
+      drawMap();
+    }
+  };
+
+
   function ensureLeafletHeat(cb){
     if(window.L && L.heatLayer){ cb(); return; }
     const existing=[...document.scripts].find(s=>String(s.src||'').includes('leaflet.heat'));
@@ -66,6 +105,7 @@
   }
 
   bindSidebarSectionToggles();
+  setTimeout(()=>{ if(typeof window.updateActiveScopeBadge==='function') window.updateActiveScopeBadge(); if(typeof window.applyScopeVisualMode==='function') window.applyScopeVisualMode(true); }, 0);
 
   function getInputNumber(id, fallback){
     const el=document.getElementById(id); const n=Number(el?.value);
@@ -295,6 +335,156 @@
     renderPredictionChart();
   };
 
+
+
+  function buildCommandActions(){
+    const summary = Array.isArray(state.summary) ? state.summary : [];
+    const alerts = Array.isArray(state.alerts) ? state.alerts : [];
+    const voronoi = Array.isArray(state.voronoiPrepositioning) ? state.voronoiPrepositioning : [];
+    const actions = [];
+
+    const criticalZones = summary.filter(r => r && r.estado === 'Crítica');
+    criticalZones.slice(0,3).forEach(r=>{
+      actions.push({
+        level:'critical',
+        title:`Reforzar ${displayZoneName(r.zona)}`,
+        desc:`Asignar refuerzo inmediato a ${displayZoneName(r.zona)}. La zona presenta estado crítico con ${r.eventos_cubiertos || 0} eventos y ${r.tiempo_total_min || 0} min estimados.`
+      });
+    });
+
+    const warnZones = summary.filter(r => r && r.estado === 'Atención');
+    if(warnZones.length){
+      const z = warnZones[0];
+      actions.push({
+        level:'warn',
+        title:`Revisar cobertura en ${displayZoneName(z.zona)}`,
+        desc:`Validar si es necesario aumentar elementos o redistribuir waypoints para reducir tiempos y evitar que la zona escale a crítica.`
+      });
+    }
+
+    if(alerts.length){
+      actions.push({
+        level:'critical',
+        title:'Atender alertas activas',
+        desc:`Existen ${alerts.length} alertas operativas activas. Prioriza las zonas con mayor severidad y confirma disponibilidad de unidades.`
+      });
+    }
+
+    const weakVoronoi = voronoi.filter(v => v && ((v.etaMin ?? 0) > 10 || (v.postsRecommended ?? 0) > (v.currentPosts ?? 0)));
+    if(weakVoronoi.length){
+      const v = weakVoronoi[0];
+      actions.push({
+        level:'info',
+        title:`Ajustar vigilancia fija en ${displayZoneName(v.zone || v.zona)}`,
+        desc:`El análisis Voronoi sugiere mejorar la cobertura estacionaria. Evalúa incrementar puestos o reubicar uno existente para reducir la respuesta.`
+      });
+    }
+
+    const optimalCount = summary.filter(r => r && r.estado === 'Óptima').length;
+    if(summary.length && optimalCount === summary.length){
+      actions.push({
+        level:'info',
+        title:'Mantener dispositivo actual',
+        desc:'La cobertura actual se encuentra estable. Continúa monitoreo y conserva la distribución operativa vigente.'
+      });
+    }
+
+    return actions.slice(0,4);
+  }
+
+  function renderCommandActions(){
+    const el = document.getElementById('commandActions');
+    if(!el) return;
+    const actions = buildCommandActions();
+    if(!actions.length){
+      el.className = 'command-empty';
+      el.innerHTML = 'No hay acciones sugeridas por el momento.';
+      return;
+    }
+    el.className = 'command-actions';
+    el.innerHTML = actions.map(a => `
+      <div class="command-action ${a.level}">
+        <div class="title">${a.title}</div>
+        <div class="desc">${a.desc}</div>
+      </div>
+    `).join('');
+  }
+
+
+  function setExecutiveKpiColor(id, value){
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(value > 3){
+      el.style.color = "#f87171";
+    }else if(value > 0){
+      el.style.color = "#fbbf24";
+    }else{
+      el.style.color = "#4ade80";
+    }
+  }
+
+  function updateExecutiveKPIs(){
+    const summary = Array.isArray(state.summary) ? state.summary : [];
+    const alerts = Array.isArray(state.alerts) ? state.alerts : [];
+    const routes = Array.isArray(state.routes) ? state.routes : [];
+    const deployments = Array.isArray(state.deployments) ? state.deployments : [];
+    const hotspots = Array.isArray(state.hotspots) ? state.hotspots : [];
+    const incidents = Array.isArray(state.incidents) ? state.incidents : [];
+
+    const criticalStates = new Set(['Crítica','Critica']);
+    const warnStates = new Set(['Atención','Atencion']);
+    const okStates = new Set(['Óptima','Optima','Cobertura','Punto fijo']);
+
+    const critical = summary.filter(r => r && criticalStates.has(r.estado)).length
+      || alerts.filter(a => a && /cr[ií]tic/i.test(`${a.title||''} ${a.message||''}`)).length
+      || 0;
+
+    const totalBase = summary.length || routes.length || deployments.length || hotspots.length || 0;
+    const coveredBase = summary.filter(r => r && okStates.has(r.estado)).length
+      || routes.length
+      || deployments.length
+      || 0;
+    const coverage = totalBase > 0 ? Math.round((coveredBase / totalBase) * 100) : 0;
+
+    const unitNames = new Set(
+      summary
+        .map(r => r && (r.unidad_a_emplear || r.unidad))
+        .filter(Boolean)
+    );
+    const units = unitNames.size
+      || summary.length
+      || routes.length
+      || deployments.length
+      || 0;
+
+    const derivedAlerts = summary.filter(r => r && (criticalStates.has(r.estado) || warnStates.has(r.estado))).length
+      || hotspots.filter(h => h && Number(h.riesgo_total || h.riesgo || 0) > 0).length
+      || incidents.length
+      || 0;
+    const alertCount = alerts.length || derivedAlerts;
+
+    const kpiCritical = document.getElementById('kpiCritical');
+    const kpiCoverage = document.getElementById('kpiCoverage');
+    const kpiUnits = document.getElementById('kpiUnits');
+    const kpiAlerts = document.getElementById('kpiAlerts');
+
+    if(kpiCritical) kpiCritical.textContent = String(critical);
+    if(kpiCoverage) kpiCoverage.textContent = `${coverage}%`;
+    if(kpiUnits) kpiUnits.textContent = String(units);
+    if(kpiAlerts) kpiAlerts.textContent = String(alertCount);
+
+    setExecutiveKpiColor('kpiCritical', critical);
+    setExecutiveKpiColor('kpiAlerts', alertCount);
+
+    if(kpiCoverage){
+      kpiCoverage.style.color = coverage < 60 ? "#f87171" : coverage < 85 ? "#fbbf24" : "#4ade80";
+    }
+    if(kpiUnits){
+      kpiUnits.style.color = units === 0 ? "#f87171" : "#93c5fd";
+    }
+  }
+
+
   window.updateKPIs=function(){
     document.getElementById('kInc').textContent=state.incidents.length;
     document.getElementById('kHot').textContent=state.hotspots.length;
@@ -304,6 +494,8 @@
     const kVor=document.getElementById('kVor'); if(kVor) kVor.textContent=(state.staticPosts||[]).length;
     const kr=document.getElementById('kRisk'); if(kr) kr.textContent=(state.analytics?.topRisk||0).toFixed(1);
     const kp=document.getElementById('kPred'); if(kp) kp.textContent=String(state.analytics?.predTotal||0);
+    if(typeof updateExecutiveKPIs==='function') updateExecutiveKPIs();
+    if(typeof renderCommandActions==='function') renderCommandActions();
   };
 
   function refreshAnalyticsAndRender(){
@@ -613,24 +805,86 @@
 
   window.renderRoutesTable=function(){
     const table=document.getElementById('routesTable'); if(!table) return;
-    const headers=['Unidad','Zona','Turno','Inicio','Fin','Estado','QR','Google Maps'];
-    const rows=(state.routes||[]).map((r,idx)=>{
+    const headers=['Unidad / Puesto','Zona','Turno / Tipo','Inicio / Posición','Fin / Referencia','Estado','QR','Google Maps'];
+
+    const routeRows=(state.routes||[]).map((r,idx)=>{
       const estadoTxt=r.voronoi_post_id ? `${r.estado||'Sin estado'} · ${r.voronoi_post_id}` : (r.estado||'Sin estado');
-      return `<tr><td>${r.unidad}</td><td>${displayZoneName(r.zona)}</td><td><span class="pill">${r.turno}</span></td><td>${r.inicio_nombre}</td><td>${r.fin_nombre}</td><td><span class="pill ${r.estadoClase||'info'}">${estadoTxt}</span></td><td><button class="ghost" onclick="showQr(${idx})">Ver QR</button></td><td>${r.google_maps_url?`<a href="${r.google_maps_url}" target="_blank" rel="noopener noreferrer">Abrir ruta</a>`:'<span class="muted">No aplica</span>'}</td></tr>`;
-    }).join('');
+      return `<tr>
+        <td>${r.unidad}</td>
+        <td>${displayZoneName(r.zona)}</td>
+        <td><span class="pill">${r.turno}</span></td>
+        <td>${r.inicio_nombre}</td>
+        <td>${r.fin_nombre}</td>
+        <td><span class="pill ${r.estadoClase||'info'}">${estadoTxt}</span></td>
+        <td><button class="ghost" onclick="showQr(${idx})">Ver QR</button></td>
+        <td>${r.google_maps_url?`<a href="${r.google_maps_url}" target="_blank" rel="noopener noreferrer">Abrir ruta</a>`:'<span class="muted">No aplica</span>'}</td>
+      </tr>`;
+    });
+
+    const postRows=(state.staticPosts||[]).map((p,idx)=>{
+      const mapsUrl=`https://www.google.com/maps?q=${Number(p.lat).toFixed(6)},${Number(p.lon).toFixed(6)}`;
+      return `<tr>
+        <td>${p.post_id}</td>
+        <td>${displayZoneName(p.zona)}</td>
+        <td><span class="pill info">Puesto fijo Voronoi</span></td>
+        <td>${Number(p.lat).toFixed(6)}, ${Number(p.lon).toFixed(6)}</td>
+        <td>Cobertura ${p.coverage_km} km</td>
+        <td><span class="pill info">ETA ${p.eta_max_min} min · ${p.unidades_sugeridas} unidad(es)</span></td>
+        <td><button class="ghost" onclick="showStaticPostQr(${idx})">Ver QR</button></td>
+        <td><a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Abrir ubicación</a></td>
+      </tr>`;
+    });
+
+    const rows=routeRows.concat(postRows).join('');
     table.innerHTML=`<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
   };
 
   assignElements = assignElementsAllUnits;
-  buildRoutes = buildRoutesOperational;
+buildRoutes = buildRoutesOperational;
 
+state.currentScope = document.getElementById('scopeSelector')?.value || state.currentScope || 'municipio';
+if(typeof window.forceRenderResources==='function'){
+  window.forceRenderResources(getDefaultResourceMap());
+}else if(typeof renderFixedResourceModule==='function'){
   renderFixedResourceModule(getDefaultResourceMap());
-  const loadTestResourcesBtn=document.getElementById('loadTestResourcesBtn');
-  if(loadTestResourcesBtn) loadTestResourcesBtn.addEventListener('click', ()=>applyResourcePreset(TEST_RESOURCE_PRESETS));
-  const clearTestResourcesBtn=document.getElementById('clearTestResourcesBtn');
-  if(clearTestResourcesBtn) clearTestResourcesBtn.addEventListener('click', clearResourcePreset);
+}
 
-  injectAnalyticsUI();
+const loadTestResourcesBtn=document.getElementById('loadTestResourcesBtn');
+if(loadTestResourcesBtn){
+  loadTestResourcesBtn.addEventListener('click', ()=>{
+    const scopeSelector=document.getElementById('scopeSelector');
+    state.currentScope = scopeSelector?.value || state.currentScope || 'municipio';
+    const preset = (typeof getScopeTestResourcePresets==='function')
+      ? getScopeTestResourcePresets()
+      : (state.currentScope==='estado' ? getZeroResourcePresets() : (typeof TEST_RESOURCE_PRESETS!=='undefined' ? TEST_RESOURCE_PRESETS : getZeroResourcePresets()));
+    if(typeof applyResourcePreset==='function'){
+      applyResourcePreset(preset);
+    }
+    if(typeof renderFixedResourceModule==='function'){
+      renderFixedResourceModule(preset);
+    }
+    if(typeof syncResourceTextarea==='function'){
+      syncResourceTextarea();
+    }
+  });
+}
+
+const clearTestResourcesBtn=document.getElementById('clearTestResourcesBtn');
+if(clearTestResourcesBtn){
+  clearTestResourcesBtn.addEventListener('click', clearResourcePreset);
+}
+
+const scopeSelector=document.getElementById('scopeSelector');
+if(scopeSelector){
+  scopeSelector.value = state.currentScope || 'municipio';
+  scopeSelector.addEventListener('change', ()=>{
+    if(typeof window.applyScopeVisualMode==='function'){
+      window.applyScopeVisualMode();
+    }
+  });
+}
+
+injectAnalyticsUI();
   const oldRunAi=document.getElementById('runAiBtn');
   if(oldRunAi){ oldRunAi.onclick=()=>{ refreshAnalyticsAndRender(); state.aiRecs=buildAiRecommendations(state.summary,state.hotspots,getResourcesFromUI()); renderAiRecommendations(); }; }
 
@@ -641,3 +895,9 @@
   const resetSimBtn=document.getElementById('resetSimBtn');
   if(resetSimBtn){ resetSimBtn.addEventListener('click', ()=>{ if(typeof resetSimulation==='function') resetSimulation(); }); }
 })();
+
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    if(typeof updateExecutiveKPIs==='function') updateExecutiveKPIs();
+    if(typeof renderCommandActions==='function') renderCommandActions();
+  });
