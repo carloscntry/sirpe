@@ -30,13 +30,8 @@ async function tryLoginRequest(path, correo, pass){
 async function iniciarSesion(){
   const correo=(document.getElementById('accessUser')?.value||'').trim();
   const pass=(document.getElementById('accessPass')?.value||'').trim();
-  if(!correo || !pass){
-    setStatusMessage('accessMessage','Ingrese correo y contraseña.','warn');
-    return;
-  }
-
+  if(!correo || !pass){ setStatusMessage('accessMessage','Ingrese correo y contraseña.','warn'); return; }
   setStatusMessage('accessMessage','Autenticando contra backend en producción...','info');
-
   try{
     const result=await tryLoginRequest('/usuarios/login', correo, pass);
     const loginData=result.data||{};
@@ -255,11 +250,16 @@ async function cargarZonasDesdeAPI({fit=false, silent=false}={}){
     }
 
     state.backendZones = Array.isArray(data) ? data : [];
+    if(typeof renderBackendZones==='function') renderBackendZones();
     if(typeof renderBackendZonesTable==='function') renderBackendZonesTable();
     if(!silent && typeof setZonesApiStatus==='function') setZonesApiStatus('Backend conectado','ok');
+
     return state.backendZones;
   }catch(err){
     console.error('Error cargando zonas desde la API:', err);
+    state.backendZones = [];
+    if(typeof renderBackendZones==='function') renderBackendZones();
+    if(typeof renderBackendZonesTable==='function') renderBackendZonesTable();
     if(!silent && typeof setZonesApiStatus==='function') setZonesApiStatus('Error de conexión','warn');
     return [];
   }

@@ -1,0 +1,6 @@
+1. Descomprime este ZIP.
+2. Reemplaza SOLO el archivo frontend/js/auth-api.js por el archivo js/auth-api.js de este paquete.
+3. Luego en la carpeta de tu repo frontend ejecuta:
+git add .
+git commit -m "fix: auth-api completo con backend render"
+git push
