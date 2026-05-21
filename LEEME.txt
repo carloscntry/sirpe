@@ -1,17 +1,14 @@
-Corrección final CECORE: usa la variable global `state` del sistema en lugar de `window.state`.
+1. Copia js/cecore-visual.js dentro de frontend/js.
 
-Reemplaza estos archivos en frontend/js:
-- routing.js
-- state.js
-- heatmap-loader.js
-- ingesta.js
-- map.js
+2. Abre frontend/index.html y agrega esta línea al FINAL, justo antes de </body>:
 
-No reemplaces auth-api.js.
+<script src="js/cecore-visual.js"></script>
 
-Después ejecuta:
+3. No reemplaces auth-api.js.
+
+4. Sube cambios:
 git add .
-git commit -m "fix: mostrar simbolos CECORE con state global"
+git commit -m "fix: agregar capa visual independiente CECORE"
 git push
 
-Luego abre la URL pública y presiona Ctrl+F5.
+5. Abre la URL pública y presiona Ctrl+F5.
