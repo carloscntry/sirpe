@@ -1,5 +1,6 @@
-// ================= CECORE VISUAL LIMPIO DEFINITIVO =================
-// Dibuja CECORE pequeños y elimina automáticamente cualquier leyenda CECORE duplicada.
+// ================= CECORE VISUAL DEFINITIVO =================
+// Dibuja CECORE pequeños en modo Estado y elimina solo leyendas duplicadas antiguas.
+// No borra su propia capa.
 
 (function(){
   const CECORES = {
@@ -52,63 +53,39 @@
     }
   }
 
-  function removeOldCecoreVisuals(){
+  function removeOwnLayer(){
     const map = getMap();
-    const st = getState();
+    if(!map) return;
 
-    if(map && st){
-      if(st.cecoreLayer){
-        try{ map.removeLayer(st.cecoreLayer); }catch(e){}
-        st.cecoreLayer = null;
-      }
-
-      if(st.cecoreLabelLayer){
-        try{ map.removeLayer(st.cecoreLabelLayer); }catch(e){}
-        st.cecoreLabelLayer = null;
-      }
-
-      if(st.cecoreLegend){
-        try{ map.removeControl(st.cecoreLegend); }catch(e){}
-        st.cecoreLegend = null;
-      }
-    }
-
-    if(map && cecoreLayer){
+    if(cecoreLayer){
       try{ map.removeLayer(cecoreLayer); }catch(e){}
       cecoreLayer = null;
     }
 
-    if(map && cecoreLegend){
+    if(cecoreLegend){
       try{ map.removeControl(cecoreLegend); }catch(e){}
       cecoreLegend = null;
     }
+  }
 
-    // Borra leyendas CECORE duplicadas creadas por parches anteriores.
+  function cleanupDuplicateLegends(){
     document.querySelectorAll(".leaflet-control").forEach(ctrl=>{
       const txt = (ctrl.textContent || "").toUpperCase().replace(/\s+/g, " ").trim();
 
-      const isOldCecore =
-        txt === "CECORE CENTRO REGIONAL" ||
-        txt.includes("CECORE CENTRO REGIONAL") ||
-        (
-          txt.includes("CECORE") &&
-          !txt.includes("CENTRO DE COORDINACIÓN REGIONAL") &&
-          !txt.includes("CENTRO DE COORDINACION REGIONAL")
-        );
-
-      if(isOldCecore){
+      // elimina solo la leyenda vieja exacta
+      if(txt === "CECORE CENTRO REGIONAL" || txt.includes("CECORE CENTRO REGIONAL")){
         ctrl.remove();
       }
     });
 
-    // Borra etiquetas antiguas de regiones si alguna quedó suelta.
-    document.querySelectorAll(
-      ".sirpe-cecore-text-label, .sirpe-cecore-final-label, .sirpe-cecore-label-final, .sirpe-cecore-icon, .cecore-marker, .sirpe-cecore-marker"
-    ).forEach(el=>{
-      const marker = el.closest(".leaflet-marker-icon");
-      if(marker) marker.remove();
-      else el.remove();
-    });
+    // si por cualquier motivo hay varias leyendas principales, deja solo la primera
+    const mainLegends = [...document.querySelectorAll(".leaflet-control")]
+      .filter(ctrl=>{
+        const txt = (ctrl.textContent || "").toUpperCase();
+        return txt.includes("CENTRO DE COORDINACIÓN REGIONAL") || txt.includes("CENTRO DE COORDINACION REGIONAL");
+      });
+
+    mainLegends.slice(1).forEach(x=>x.remove());
   }
 
   function addLegend(map){
@@ -134,9 +111,6 @@
     };
 
     cecoreLegend.addTo(map);
-
-    const st = getState();
-    if(st) st.cecoreLegend = cecoreLegend;
   }
 
   function draw(){
@@ -145,7 +119,8 @@
     const map = getMap();
     if(!map) return false;
 
-    removeOldCecoreVisuals();
+    removeOwnLayer();
+    cleanupDuplicateLegends();
 
     if(!isEstado()) return false;
 
@@ -177,51 +152,18 @@
     });
 
     cecoreLayer = L.layerGroup(circles).addTo(map);
-
-    const st = getState();
-    if(st){
-      st.cecoreLayer = cecoreLayer;
-      st.cecoreLabelLayer = null;
-    }
-
     addLegend(map);
-    removeOldCecoreVisuals();
-    addLegend(map);
+    cleanupDuplicateLegends();
 
+    console.info("CECORE dibujados:", circles.length);
     return true;
-  }
-
-  function cleanupDuplicatesOnly(){
-    document.querySelectorAll(".leaflet-control").forEach(ctrl=>{
-      const txt = (ctrl.textContent || "").toUpperCase().replace(/\s+/g, " ").trim();
-
-      if(
-        txt === "CECORE CENTRO REGIONAL" ||
-        txt.includes("CECORE CENTRO REGIONAL") ||
-        (
-          txt.includes("CECORE") &&
-          !txt.includes("CENTRO DE COORDINACIÓN REGIONAL") &&
-          !txt.includes("CENTRO DE COORDINACION REGIONAL")
-        )
-      ){
-        ctrl.remove();
-      }
-    });
-
-    const allMain = [...document.querySelectorAll(".leaflet-control")]
-      .filter(ctrl=>{
-        const txt = (ctrl.textContent || "").toUpperCase();
-        return txt.includes("CENTRO DE COORDINACIÓN REGIONAL") || txt.includes("CENTRO DE COORDINACION REGIONAL");
-      });
-
-    allMain.slice(1).forEach(x=>x.remove());
   }
 
   function schedule(){
     setTimeout(draw, 100);
     setTimeout(draw, 700);
     setTimeout(draw, 1500);
-    setTimeout(cleanupDuplicatesOnly, 2200);
+    setTimeout(draw, 3000);
   }
 
   window.renderCecoresVisualFinal = draw;
@@ -237,8 +179,8 @@
     schedule();
   });
 
-  if(typeof window.drawMap === "function" && !window.__cecoreNoDuplicateWrapped){
-    window.__cecoreNoDuplicateWrapped = true;
+  if(typeof window.drawMap === "function" && !window.__cecoreFinalNoDeleteWrapped){
+    window.__cecoreFinalNoDeleteWrapped = true;
     const oldDrawMap = window.drawMap;
 
     window.drawMap = function(){
@@ -250,15 +192,13 @@
 
   setInterval(()=>{
     if(isEstado()){
-      cleanupDuplicatesOnly();
-    }
-  }, 500);
-
-  setInterval(()=>{
-    if(isEstado()){
-      draw();
+      cleanupDuplicateLegends();
+      if(!cecoreLayer){
+        draw();
+      }
     }else{
-      removeOldCecoreVisuals();
+      removeOwnLayer();
+      cleanupDuplicateLegends();
     }
-  }, 4000);
+  }, 1500);
 })();
