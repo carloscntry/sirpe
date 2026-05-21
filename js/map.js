@@ -585,3 +585,23 @@ if(typeof drawMap === 'function' && !window.__cecoreDrawMapWrapped){
     return result;
   };
 }
+
+
+window.forceRenderCecores = function(){
+  try{
+    if(typeof renderCecoresOnStateMap === 'function'){
+      renderCecoresOnStateMap();
+    }
+  }catch(e){
+    console.warn('CECORE render error', e);
+  }
+};
+
+setTimeout(()=>{
+  try{
+    if(typeof window.forceRenderCecores==='function'){
+      window.forceRenderCecores();
+    }
+  }catch(e){}
+}, 500);
+

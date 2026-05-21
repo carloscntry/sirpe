@@ -5,7 +5,7 @@ const state = {
   map:null, sectorLayer:null, hotspotLayer:null, routeLayer:null, markerLayer:null, simLayer:null, voronoiLayer:null, staticPostLayer:null, apiZoneLayer:null, scopePreviewLayer:null, cecoreLayer:null, zoneStatusLegend:null, cecoreLegend:null,
   simIndex:0, simTimer:null, simRunning:false, simRoutes:[], simMarkers:{},
   currentQr:null, currentQrUrl:null, currentQrName:null,
-  apiBaseUrl:'http://127.0.0.1:8000',
+  apiBaseUrl:'https://sirpe-backend.onrender.com',
   authToken:'', currentUser:null, authProfile:null,
   folio:'', operator:'', operatorRole:'', accessLevel:'', processDate:'',
   currentScope:'municipio',
