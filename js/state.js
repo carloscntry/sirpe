@@ -2,7 +2,7 @@
 const state = {
   incidents: [], sectors: [], hotspots: [], deployments: [], routes: [], summary: [], alerts: [], aiRecs: [],
   staticPosts: [], voronoiCells: [], backendZones: [],
-  map:null, sectorLayer:null, hotspotLayer:null, routeLayer:null, markerLayer:null, simLayer:null, voronoiLayer:null, staticPostLayer:null, apiZoneLayer:null, scopePreviewLayer:null, cecoreLayer:null, zoneStatusLegend:null, cecoreLegend:null,
+  map:null, sectorLayer:null, hotspotLayer:null, routeLayer:null, markerLayer:null, simLayer:null, voronoiLayer:null, staticPostLayer:null, apiZoneLayer:null, scopePreviewLayer:null, cecoreLayer:null, cecoreLabelLayer:null, zoneStatusLegend:null, cecoreLegend:null,
   simIndex:0, simTimer:null, simRunning:false, simRoutes:[], simMarkers:{},
   currentQr:null, currentQrUrl:null, currentQrName:null,
   apiBaseUrl:'https://sirpe-backend.onrender.com',

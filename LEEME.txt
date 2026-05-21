@@ -1,15 +1,8 @@
-Reemplaza estos archivos dentro de frontend/js:
-- routing.js
-- state.js
-- heatmap-loader.js
-- ingesta.js
-- map.js
+Reemplaza estos archivos en frontend/js. No reemplaces auth-api.js.
 
-No reemplaces auth-api.js.
-
-Después ejecuta:
+Luego ejecuta:
 git add .
-git commit -m "fix: CECORE visible y rutas estatales"
+git commit -m "fix: simbolos CECORE visibles en mapa estatal"
 git push
 
-Luego abre GitHub Pages y presiona Ctrl+F5.
+Después abre la URL pública y presiona Ctrl+F5.

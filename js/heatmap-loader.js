@@ -919,3 +919,17 @@ setTimeout(()=>{
   }
   if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap();
 }, 300);
+
+
+// CECORE visible redraw hook final
+setTimeout(function(){
+  const scopeSelector=document.getElementById('scopeSelector');
+  if(scopeSelector && !scopeSelector.dataset.cecoreVisibleHookFinal){
+    scopeSelector.dataset.cecoreVisibleHookFinal='1';
+    scopeSelector.addEventListener('change',function(){
+      setTimeout(function(){ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); },250);
+      setTimeout(function(){ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); },1000);
+    });
+  }
+  if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap();
+},1000);
