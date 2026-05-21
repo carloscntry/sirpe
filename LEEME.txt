@@ -1,8 +1,17 @@
-Reemplaza estos archivos en frontend/js. No reemplaces auth-api.js.
+Corrección final CECORE: usa la variable global `state` del sistema en lugar de `window.state`.
 
-Luego ejecuta:
+Reemplaza estos archivos en frontend/js:
+- routing.js
+- state.js
+- heatmap-loader.js
+- ingesta.js
+- map.js
+
+No reemplaces auth-api.js.
+
+Después ejecuta:
 git add .
-git commit -m "fix: simbolos CECORE visibles en mapa estatal"
+git commit -m "fix: mostrar simbolos CECORE con state global"
 git push
 
-Después abre la URL pública y presiona Ctrl+F5.
+Luego abre la URL pública y presiona Ctrl+F5.

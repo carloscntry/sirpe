@@ -921,15 +921,15 @@ setTimeout(()=>{
 }, 300);
 
 
-// CECORE visible redraw hook final
-setTimeout(function(){
-  const scopeSelector=document.getElementById('scopeSelector');
-  if(scopeSelector && !scopeSelector.dataset.cecoreVisibleHookFinal){
-    scopeSelector.dataset.cecoreVisibleHookFinal='1';
-    scopeSelector.addEventListener('change',function(){
-      setTimeout(function(){ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); },250);
-      setTimeout(function(){ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); },1000);
+// CECORE final state global hook
+setTimeout(()=>{
+  const scopeSelector = document.getElementById('scopeSelector');
+  if(scopeSelector && !scopeSelector.dataset.cecoreFinalGlobalHook){
+    scopeSelector.dataset.cecoreFinalGlobalHook = '1';
+    scopeSelector.addEventListener('change', ()=>{
+      setTimeout(()=>{ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); }, 300);
+      setTimeout(()=>{ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); }, 1200);
     });
   }
   if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap();
-},1000);
+}, 1200);
