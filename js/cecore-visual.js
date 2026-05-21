@@ -1,7 +1,4 @@
 // ================= CECORE VISUAL INDEPENDIENTE =================
-// Este archivo debe cargarse al final del index.html, después de map.js y heatmap-loader.js.
-// Dibuja los CECORE directamente sobre el mapa Leaflet cuando el ámbito activo es Estado.
-
 (function(){
   const CECORES = {
     "REGION 1": {nombre:"CECORE REGION 1", lat:20.168071, lon:-98.078960},
@@ -54,34 +51,34 @@
     }
   }
 
-  function removeLayer(map, layer){
-    if(layer){
-      try{ map.removeLayer(layer); }catch(e){}
-    }
-  }
+  function clear(){
+    const map = getMap();
+    if(!map) return;
 
-  function removeLegend(map){
+    if(cecoreLayer){
+      try{ map.removeLayer(cecoreLayer); }catch(e){}
+      cecoreLayer = null;
+    }
+
+    if(cecoreLabels){
+      try{ map.removeLayer(cecoreLabels); }catch(e){}
+      cecoreLabels = null;
+    }
+
     if(cecoreLegend){
       try{ map.removeControl(cecoreLegend); }catch(e){}
       cecoreLegend = null;
     }
   }
 
-  function clear(){
-    const map = getMap();
-    if(!map) return;
-    removeLayer(map, cecoreLayer);
-    removeLayer(map, cecoreLabels);
-    removeLegend(map);
-    cecoreLayer = null;
-    cecoreLabels = null;
-  }
-
   function addLegend(map){
     if(cecoreLegend) return;
+
     cecoreLegend = L.control({position:"topright"});
+
     cecoreLegend.onAdd = function(){
-      const div = L.DomUtil.create("div", "sirpe-cecore-legend-final");
+      const div = L.DomUtil.create("div");
+
       div.style.background = "rgba(255,255,255,.97)";
       div.style.padding = "8px 10px";
       div.style.border = "1px solid #d5e0ea";
@@ -89,15 +86,21 @@
       div.style.boxShadow = "0 10px 24px rgba(15,35,58,.18)";
       div.style.fontSize = "12px";
       div.style.color = "#16324a";
-      div.style.zIndex = "99999";
-      div.innerHTML = '<b>CECORE</b><br><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span> Centros Regionales';
+
+      div.innerHTML =
+        '<b>Centro de Coordinación Regional</b><br>' +
+        '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span>' +
+        'CECORE';
+
       return div;
     };
+
     cecoreLegend.addTo(map);
   }
 
   function draw(){
     if(!window.L) return false;
+
     const map = getMap();
     if(!map) return false;
 
@@ -109,14 +112,16 @@
     const labels = [];
 
     Object.entries(CECORES).forEach(([region, c])=>{
+
       const lat = Number(c.lat);
       const lon = Number(c.lon);
+
       if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
       const circle = L.circleMarker([lat, lon], {
-        radius: 12,
+        radius: 7,
         color: "#7f1d1d",
-        weight: 3,
+        weight: 2,
         fillColor: "#dc2626",
         fillOpacity: 1,
         opacity: 1
@@ -126,8 +131,7 @@
         "<b>" + c.nombre + "</b><br>" +
         "Región: <b>" + region + "</b><br>" +
         "Latitud: " + lat.toFixed(6) + "<br>" +
-        "Longitud: " + lon.toFixed(6) + "<br>" +
-        '<a href="https://www.google.com/maps?q=' + lat + ',' + lon + '" target="_blank">Abrir en Google Maps</a>'
+        "Longitud: " + lon.toFixed(6)
       );
 
       const label = L.marker([lat, lon], {
@@ -135,9 +139,21 @@
         zIndexOffset: 50000,
         icon: L.divIcon({
           className: "sirpe-cecore-label-final",
-          html: '<div style="background:#fff;color:#7f1d1d;border:1px solid #fecaca;border-radius:8px;padding:2px 6px;font-size:11px;font-weight:900;box-shadow:0 4px 10px rgba(0,0,0,.22);white-space:nowrap;">' + region + "</div>",
+          html:
+            '<div style="' +
+            'background:#fff;' +
+            'color:#7f1d1d;' +
+            'border:1px solid #fecaca;' +
+            'border-radius:8px;' +
+            'padding:2px 5px;' +
+            'font-size:10px;' +
+            'font-weight:800;' +
+            'box-shadow:0 3px 8px rgba(0,0,0,.18);' +
+            'white-space:nowrap;">' +
+            region +
+            "</div>",
           iconSize: null,
-          iconAnchor: [-14, 30]
+          iconAnchor: [-12, 22]
         })
       });
 
@@ -148,31 +164,24 @@
     cecoreLayer = L.layerGroup(circles).addTo(map);
     cecoreLabels = L.layerGroup(labels).addTo(map);
 
-    try{
-      cecoreLayer.eachLayer(l=>{ if(l.bringToFront) l.bringToFront(); });
-      cecoreLabels.eachLayer(l=>{ if(l.setZIndexOffset) l.setZIndexOffset(50000); });
-    }catch(e){}
-
     addLegend(map);
 
-    console.info("CECORE visual independiente dibujado:", circles.length);
-    return circles.length > 0;
+    return true;
   }
-
-  window.renderCecoresVisualFinal = draw;
 
   function schedule(){
     setTimeout(draw, 100);
     setTimeout(draw, 700);
     setTimeout(draw, 1500);
-    setTimeout(draw, 3000);
   }
 
   window.addEventListener("DOMContentLoaded", ()=>{
     const selector = document.getElementById("scopeSelector");
+
     if(selector){
       selector.addEventListener("change", schedule);
     }
+
     schedule();
   });
 
