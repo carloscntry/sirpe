@@ -1,4 +1,6 @@
-// ================= CECORE VISUAL INDEPENDIENTE =================
+// ================= CECORE VISUAL FINAL LIMPIO =================
+// Limpia capas/leyendas CECORE anteriores y dibuja símbolos pequeños sin etiquetas duplicadas.
+
 (function(){
   const CECORES = {
     "REGION 1": {nombre:"CECORE REGION 1", lat:20.168071, lon:-98.078960},
@@ -14,8 +16,8 @@
     "REGION 11": {nombre:"CECORE REGION 11", lat:18.378164, lon:-97.273977}
   };
 
-  let cecoreLayer = null;
-  let cecoreLegend = null;
+  let cleanCecoreLayer = null;
+  let cleanCecoreLegend = null;
 
   function getState(){
     try{
@@ -50,28 +52,70 @@
     }
   }
 
-  function clear(){
+  function removeKnownCecoreLayers(){
+    const st = getState();
     const map = getMap();
     if(!map) return;
 
-    if(cecoreLayer){
-      try{ map.removeLayer(cecoreLayer); }catch(e){}
-      cecoreLayer = null;
+    const keys = [
+      "cecoreLayer",
+      "cecoreLabelLayer",
+      "cecoreLegend"
+    ];
+
+    keys.forEach(k=>{
+      if(st && st[k]){
+        try{
+          if(k.toLowerCase().includes("legend")) map.removeControl(st[k]);
+          else map.removeLayer(st[k]);
+        }catch(e){}
+        st[k] = null;
+      }
+    });
+
+    if(cleanCecoreLayer){
+      try{ map.removeLayer(cleanCecoreLayer); }catch(e){}
+      cleanCecoreLayer = null;
     }
 
-    if(cecoreLegend){
-      try{ map.removeControl(cecoreLegend); }catch(e){}
-      cecoreLegend = null;
+    if(cleanCecoreLegend){
+      try{ map.removeControl(cleanCecoreLegend); }catch(e){}
+      cleanCecoreLegend = null;
     }
+
+    // Quita leyendas DOM duplicadas creadas por parches anteriores.
+    document.querySelectorAll(
+      ".sirpe-cecore-visible-legend, .sirpe-cecore-final-legend, .sirpe-cecore-legend-final, .cecore-legend, .sirpe-cecore-visible-legend"
+    ).forEach(el=>{
+      const parent = el.closest(".leaflet-control");
+      if(parent) parent.remove();
+      else el.remove();
+    });
+
+    // Quita etiquetas REGION creadas por parches anteriores, si quedaron como divIcon.
+    document.querySelectorAll(
+      ".sirpe-cecore-text-label, .sirpe-cecore-final-label, .sirpe-cecore-label-final"
+    ).forEach(el=>{
+      const icon = el.closest(".leaflet-marker-icon");
+      if(icon) icon.remove();
+      else el.remove();
+    });
+
+    // Quita iconos pin antiguos creados por parches anteriores.
+    document.querySelectorAll(
+      ".sirpe-cecore-icon, .cecore-marker, .sirpe-cecore-marker"
+    ).forEach(el=>{
+      const icon = el.closest(".leaflet-marker-icon");
+      if(icon) icon.remove();
+      else el.remove();
+    });
   }
 
   function addLegend(map){
-    if(cecoreLegend) return;
+    cleanCecoreLegend = L.control({position:"topright"});
 
-    cecoreLegend = L.control({position:"topright"});
-
-    cecoreLegend.onAdd = function(){
-      const div = L.DomUtil.create("div");
+    cleanCecoreLegend.onAdd = function(){
+      const div = L.DomUtil.create("div", "sirpe-cecore-clean-legend");
 
       div.style.background = "rgba(255,255,255,.97)";
       div.style.padding = "8px 10px";
@@ -83,13 +127,13 @@
 
       div.innerHTML =
         '<b>Centro de Coordinación Regional</b><br>' +
-        '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span>' +
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span>' +
         'CECORE';
 
       return div;
     };
 
-    cecoreLegend.addTo(map);
+    cleanCecoreLegend.addTo(map);
   }
 
   function draw(){
@@ -98,25 +142,24 @@
     const map = getMap();
     if(!map) return false;
 
-    clear();
+    removeKnownCecoreLayers();
 
     if(!isEstado()) return false;
 
     const circles = [];
 
     Object.entries(CECORES).forEach(([region, c])=>{
-
       const lat = Number(c.lat);
       const lon = Number(c.lon);
 
       if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
       const circle = L.circleMarker([lat, lon], {
-        radius: 5,
+        radius: 4,
         color: "#7f1d1d",
-        weight: 2,
+        weight: 1.5,
         fillColor: "#dc2626",
-        fillOpacity: 1,
+        fillOpacity: 0.95,
         opacity: 1
       });
 
@@ -130,7 +173,15 @@
       circles.push(circle);
     });
 
-    cecoreLayer = L.layerGroup(circles).addTo(map);
+    cleanCecoreLayer = L.layerGroup(circles).addTo(map);
+
+    // también guarda referencia en state para evitar que otros procesos de limpieza la ignoren
+    const st = getState();
+    if(st){
+      st.cecoreLayer = cleanCecoreLayer;
+      st.cecoreLabelLayer = null;
+      st.cecoreLegend = cleanCecoreLegend;
+    }
 
     addLegend(map);
 
@@ -141,7 +192,11 @@
     setTimeout(draw, 100);
     setTimeout(draw, 700);
     setTimeout(draw, 1500);
+    setTimeout(draw, 3000);
   }
+
+  window.renderCecoresVisualFinal = draw;
+  window.renderCecoresOnStateMap = draw;
 
   window.addEventListener("DOMContentLoaded", ()=>{
     const selector = document.getElementById("scopeSelector");
@@ -153,9 +208,22 @@
     schedule();
   });
 
+  // Reaplica después de redibujos del mapa.
+  if(typeof window.drawMap === "function" && !window.__cecoreCleanDrawWrapped){
+    window.__cecoreCleanDrawWrapped = true;
+    const oldDrawMap = window.drawMap;
+    window.drawMap = function(){
+      const result = oldDrawMap.apply(this, arguments);
+      schedule();
+      return result;
+    };
+  }
+
   setInterval(()=>{
-    if(isEstado() && !cecoreLayer){
+    if(isEstado()){
       draw();
+    }else{
+      removeKnownCecoreLayers();
     }
-  }, 2500);
+  }, 3500);
 })();
