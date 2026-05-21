@@ -1,37 +1,9 @@
 // ================= AUTH / API =================
-const API_BASE = "https://sirpe-backend.onrender.com";
-
-function buildApiUrl(path){
-  if(!path) return API_BASE;
-  if(/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
-}
-
-async function tryLoginRequest(path, correo, pass){
-  const response = await fetch(buildApiUrl(path), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ correo, password: pass })
-  });
-
-  let data = null;
-  try{
-    data = await response.json();
-  }catch(e){
-    data = null;
-  }
-
-  if(!response.ok){
-    throw new Error(data?.detail || data?.message || 'No se pudo iniciar sesión. Verifica correo y contraseña.');
-  }
-
-  return { response, data };
-}
 async function iniciarSesion(){
   const correo=(document.getElementById('accessUser')?.value||'').trim();
   const pass=(document.getElementById('accessPass')?.value||'').trim();
   if(!correo || !pass){ setStatusMessage('accessMessage','Ingrese correo y contraseña.','warn'); return; }
-  setStatusMessage('accessMessage','Autenticando contra backend en producción...','info');
+  setStatusMessage('accessMessage','Autenticando contra FastAPI...','info');
   try{
     const result=await tryLoginRequest('/usuarios/login', correo, pass);
     const loginData=result.data||{};
@@ -44,7 +16,7 @@ async function iniciarSesion(){
     persistSession();
     hideAccessOverlay();
     setStatusMessage('accessMessage','Sesión iniciada correctamente mediante /usuarios/login.','ok');
-    await cargarZonasDesdeAPI({fit:true, silent:false});
+    setZonesApiStatus('Fuente local','ok');
   }catch(err){
     console.error('Error de login:', err);
     setStatusMessage('accessMessage', err?.message || 'No se pudo iniciar sesión. Verifica correo y contraseña.','danger');
@@ -232,37 +204,10 @@ function renderBackendZones(){
 }
 
 async function cargarZonasDesdeAPI({fit=false, silent=false}={}){
-  try{
-    const response = await fetch(buildApiUrl('/zonas/'), {
-      method: 'GET',
-      headers: state?.authToken ? { Authorization: `Bearer ${state.authToken}` } : {}
-    });
-
-    let data = [];
-    try{
-      data = await response.json();
-    }catch(e){
-      data = [];
-    }
-
-    if(!response.ok){
-      throw new Error('No fue posible cargar zonas desde el backend.');
-    }
-
-    state.backendZones = Array.isArray(data) ? data : [];
-    if(typeof renderBackendZones==='function') renderBackendZones();
-    if(typeof renderBackendZonesTable==='function') renderBackendZonesTable();
-    if(!silent && typeof setZonesApiStatus==='function') setZonesApiStatus('Backend conectado','ok');
-
-    return state.backendZones;
-  }catch(err){
-    console.error('Error cargando zonas desde la API:', err);
-    state.backendZones = [];
-    if(typeof renderBackendZones==='function') renderBackendZones();
-    if(typeof renderBackendZonesTable==='function') renderBackendZonesTable();
-    if(!silent && typeof setZonesApiStatus==='function') setZonesApiStatus('Error de conexión','warn');
-    return [];
-  }
+  state.backendZones = [];
+  if(typeof renderBackendZones==='function') renderBackendZones();
+  if(typeof setZonesApiStatus==='function') setZonesApiStatus('Fuente local','ok');
+  return [];
 }
 function parseHoraToHour(v){ if(v==null||v==='') return 0; if(typeof v==='number') return Math.max(0,Math.min(23,Math.floor(v))); const s=String(v); const m=s.match(/(\d{1,2})[:\.](\d{1,2})/); if(m) return Math.max(0,Math.min(23,parseInt(m[1],10))); const n=parseInt(s,10); return Number.isFinite(n)?Math.max(0,Math.min(23,n)):0; }
 function getTurno(h){ if(h>=0&&h<6) return 'madrugada'; if(h>=6&&h<12) return 'mañana'; if(h>=12&&h<18) return 'tarde'; return 'noche'; }

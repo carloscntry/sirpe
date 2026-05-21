@@ -35,6 +35,7 @@
     if(state.map && typeof drawMap==='function' && Array.isArray(state.sectors) && state.sectors.length){
       drawMap();
     }
+    setTimeout(()=>{ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); }, 50);
   };
 
 
@@ -741,18 +742,17 @@
           mission=missionData.mission || 'patrullaje_preventivo';
         }
 
-        let dist=0;
-        for(let j=0;j<ordered.length-1;j++){
-          dist += haversineKm(ordered[j].lat,ordered[j].lon,ordered[j+1].lat,ordered[j+1].lon);
-        }
-        const tiempoConduccion=ordered.length>1 ? (dist/Math.max(5, Number(velKmh)||30))*60 : 0;
+        const cecoreRoute = applyCecoreToRoutePoints(zona, ordered);
+        const routePoints = cecoreRoute.routePoints;
+        const dist = calcDistanceKm(routePoints);
+        const tiempoConduccion=routePoints.length>1 ? (dist/Math.max(5, Number(velKmh)||30))*60 : 0;
         const tiempoParadas=ordered.length*Math.max(1, Number(minParada)||5);
         const tiempoTotal=tiempoConduccion+tiempoParadas;
         const riskCovered=ordered.reduce((s,x)=>s+(Number(x.riesgo)||0),0);
         const eventsCovered=ordered.reduce((s,x)=>s+(Number(x.eventos)||0),0);
         const probCovered=ordered.reduce((s,x)=>s+(Number(x.probabilidad)||0),0);
         const routeMode=ordered.length<=1 ? 'punto_fijo' : (mission==='patrullaje_preventivo' ? 'patrullaje_preventivo' : 'ruta_movil');
-        const url=ordered.length>=2 ? makeGoogleMapsUrl(ordered) : '';
+        const url=routePoints.length>=2 ? makeGoogleMapsUrl(routePoints) : '';
 
         let estado='Patrullaje preventivo', estadoClase='ok';
         if(mission==='punto_fijo_voronoi'){
@@ -775,13 +775,17 @@
           riesgo_cubierto:riskCovered, prob_cubierta:probCovered,
           distancia_km:Number(dist.toFixed(3)), tiempo_total_min:Number(tiempoTotal.toFixed(1)),
           google_maps_url:url,
-          inicio_nombre:ordered[0]?.nombre || 'Sin punto',
-          inicio_lat:ordered[0]?.lat ?? null,
-          inicio_lon:ordered[0]?.lon ?? null,
-          fin_nombre:ordered[ordered.length-1]?.nombre || 'Sin punto',
-          fin_lat:ordered[ordered.length-1]?.lat ?? null,
-          fin_lon:ordered[ordered.length-1]?.lon ?? null,
-          estado, estadoClase, route_mode:routeMode, mission_type:mission, points:ordered,
+          inicio_nombre:routePoints[0]?.nombre || 'Sin punto',
+          inicio_lat:routePoints[0]?.lat ?? null,
+          inicio_lon:routePoints[0]?.lon ?? null,
+          fin_nombre:routePoints[routePoints.length-1]?.nombre || 'Sin punto',
+          fin_lat:routePoints[routePoints.length-1]?.lat ?? null,
+          fin_lon:routePoints[routePoints.length-1]?.lon ?? null,
+          estado, estadoClase, route_mode:routeMode, mission_type:mission, points:routePoints,
+          cecore_nombre:cecoreRoute.cecore?.nombre || '',
+          cecore_lat:cecoreRoute.cecore?.lat ?? null,
+          cecore_lon:cecoreRoute.cecore?.lon ?? null,
+          operational_points:ordered,
           voronoi_post_id: fixedPost?.post_id || null
         });
 
@@ -796,6 +800,7 @@
           tiempo_total_min:Number(tiempoTotal.toFixed(1)),
           tiempo_total_horas:Number((tiempoTotal/60).toFixed(2)),
           estado, route_mode:routeMode, mission_type:mission, google_maps_url:url,
+          cecore_nombre:cecoreRoute.cecore?.nombre || '',
           voronoi_post_id: fixedPost?.post_id || null
         });
       }
@@ -901,3 +906,16 @@ injectAnalyticsUI();
     if(typeof updateExecutiveKPIs==='function') updateExecutiveKPIs();
     if(typeof renderCommandActions==='function') renderCommandActions();
   });
+
+
+// force CECORE markers on selector change
+setTimeout(()=>{
+  const scopeSelector = document.getElementById('scopeSelector');
+  if(scopeSelector && !scopeSelector.dataset.cecoreBound){
+    scopeSelector.dataset.cecoreBound = '1';
+    scopeSelector.addEventListener('change', ()=>{
+      setTimeout(()=>{ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); }, 100);
+    });
+  }
+  if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap();
+}, 300);

@@ -1,4 +1,196 @@
+
+// ================= CECORE MAP VISUALIZATION =================
+const CECORE_VISUAL_POINTS = {
+  "REGION 1": {lat:20.168071, lon:-98.078960, nombre:"CECORE REGION 1"},
+  "REGION 2": {lat:19.8616700, lon:-98.0169652, nombre:"CECORE REGION 2"},
+  "REGION 3": {lat:19.826258, lon:-97.349342, nombre:"CECORE REGION 3"},
+  "REGION 4": {lat:19.278831, lon:-98.446680, nombre:"CECORE REGION 4"},
+  "REGION 5": {lat:19.03634600, lon:-98.19059700, nombre:"CECORE REGION 5"},
+  "REGION 6": {lat:18.989700, lon:-97.905805, nombre:"CECORE REGION 6"},
+  "REGION 7": {lat:19.009628, lon:-97.462171, nombre:"CECORE REGION 7"},
+  "REGION 8": {lat:18.885057, lon:-98.499458, nombre:"CECORE REGION 8"},
+  "REGION 9": {lat:18.233243, lon:-98.0, nombre:"CECORE REGION 9"},
+  "REGION 10": {lat:18.479156, lon:-97.443413, nombre:"CECORE REGION 10"},
+  "REGION 11": {lat:18.378164, lon:-97.273977, nombre:"CECORE REGION 11"}
+};
+
+function getCurrentScopeValue(){
+  return document.getElementById('scopeSelector')?.value || state?.currentScope || 'municipio';
+}
+
+function renderCecoresOnStateMap(){
+  if(!state.map) return;
+  const scope = getCurrentScopeValue();
+
+  if(state.cecoreLayer){
+    try{ state.map.removeLayer(state.cecoreLayer); }catch(e){}
+    state.cecoreLayer = null;
+  }
+  if(state.cecoreLegend){
+    try{ state.map.removeControl(state.cecoreLegend); }catch(e){}
+    state.cecoreLegend = null;
+  }
+
+  if(scope !== 'estado') return;
+
+  const features = Object.entries(CECORE_VISUAL_POINTS).map(([region, c])=>({
+    type:'Feature',
+    properties:{ region, nombre:c.nombre, lat:c.lat, lon:c.lon },
+    geometry:{ type:'Point', coordinates:[c.lon, c.lat] }
+  }));
+
+  state.cecoreLayer = L.geoJSON({type:'FeatureCollection', features}, {
+    pointToLayer:(feature, latlng)=>{
+      return L.marker(latlng, {
+        zIndexOffset: 10000,
+        icon: L.divIcon({
+          className:'sirpe-cecore-marker',
+          html:`<div style="
+            width:24px;height:24px;border-radius:50% 50% 50% 0;
+            background:#dc2626;border:3px solid #ffffff;
+            transform:rotate(-45deg);
+            box-shadow:0 6px 16px rgba(0,0,0,.35);">
+            <span style="
+              position:absolute;left:50%;top:50%;
+              width:8px;height:8px;border-radius:50%;
+              background:#ffffff;transform:translate(-50%,-50%);"></span>
+          </div>`,
+          iconSize:[30,30],
+          iconAnchor:[15,30],
+          popupAnchor:[0,-28]
+        })
+      });
+    },
+    onEachFeature:(feature, layer)=>{
+      const p = feature.properties;
+      layer.bindPopup(`
+        <b>${p.nombre}</b><br>
+        Región: <b>${p.region}</b><br>
+        Latitud: ${Number(p.lat).toFixed(6)}<br>
+        Longitud: ${Number(p.lon).toFixed(6)}<br>
+        <a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank">Abrir en Google Maps</a>
+      `);
+      layer.bindTooltip(p.nombre, {direction:'top'});
+    }
+  }).addTo(state.map);
+
+  const legend = L.control({position:'topright'});
+  legend.onAdd = function(){
+    const div = L.DomUtil.create('div','sirpe-cecore-legend');
+    div.style.background='rgba(255,255,255,.96)';
+    div.style.padding='8px 10px';
+    div.style.border='1px solid #d5e0ea';
+    div.style.borderRadius='12px';
+    div.style.boxShadow='0 10px 24px rgba(15,35,58,.14)';
+    div.style.fontSize='12px';
+    div.style.color='#16324a';
+    div.innerHTML='<b>CECORE</b><br><span style="color:#dc2626;font-size:18px;">●</span> Centros de Coordinación Regional';
+    return div;
+  };
+  legend.addTo(state.map);
+  state.cecoreLegend = legend;
+}
+window.renderCecoresOnStateMap = renderCecoresOnStateMap;
+
+
 // ================= MAP =================
+
+function isEstadoScopeActive(){
+  const scope = document.getElementById('scopeSelector')?.value || state?.currentScope || 'municipio';
+  return scope === 'estado';
+}
+
+function buildCecoreFeatures(){
+  if(typeof ESTADO_CECORES === 'undefined' || !ESTADO_CECORES) return [];
+  return Object.entries(ESTADO_CECORES).map(([region, c])=>({
+    type:'Feature',
+    properties:{
+      region,
+      nombre:c.nombre || `CECORE ${region}`,
+      tipo:'CECORE',
+      lat:Number(c.lat),
+      lon:Number(c.lon)
+    },
+    geometry:{
+      type:'Point',
+      coordinates:[Number(c.lon), Number(c.lat)]
+    }
+  })).filter(f=>Number.isFinite(f.properties.lat) && Number.isFinite(f.properties.lon));
+}
+
+function addCecoreLayerToMap(){
+  if(!state.map || !isEstadoScopeActive()) return;
+  if(state.cecoreLayer){
+    try{ state.map.removeLayer(state.cecoreLayer); }catch(e){}
+    state.cecoreLayer = null;
+  }
+
+  const features = buildCecoreFeatures();
+  if(!features.length) return;
+
+  state.cecoreLayer = L.geoJSON(
+    {type:'FeatureCollection', features},
+    {
+      pointToLayer:(f, latlng)=>{
+        return L.marker(latlng, {
+          icon: L.divIcon({
+            className:'cecore-marker',
+            html:`<div style="
+              width:22px;height:22px;border-radius:50% 50% 50% 0;
+              background:#dc2626;border:3px solid #fff;
+              transform:rotate(-45deg);
+              box-shadow:0 4px 12px rgba(0,0,0,.28);
+              position:relative;">
+              <span style="
+                position:absolute;left:50%;top:50%;
+                width:7px;height:7px;border-radius:50%;
+                background:#fff;transform:translate(-50%,-50%);"></span>
+            </div>`,
+            iconSize:[28,28],
+            iconAnchor:[14,28],
+            popupAnchor:[0,-24]
+          })
+        });
+      },
+      onEachFeature:(f,l)=>{
+        const p=f.properties || {};
+        l.bindPopup(`
+          <b>${p.nombre}</b><br>
+          Región: <b>${p.region}</b><br>
+          Latitud: ${Number(p.lat).toFixed(6)}<br>
+          Longitud: ${Number(p.lon).toFixed(6)}<br>
+          <a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank">Abrir en Google Maps</a>
+        `);
+        l.bindTooltip(`${p.nombre}`, {permanent:false, direction:'top'});
+      }
+    }
+  ).addTo(state.map);
+}
+
+function addCecoreLegend(){
+  if(!state.map || !isEstadoScopeActive()) return;
+  if(state.cecoreLegend){
+    try{ state.map.removeControl(state.cecoreLegend); }catch(e){}
+    state.cecoreLegend = null;
+  }
+  const legend = L.control({position:'topleft'});
+  legend.onAdd = function(){
+    const div = L.DomUtil.create('div', 'info cecore-legend');
+    div.style.background = 'rgba(255,255,255,.96)';
+    div.style.border = '1px solid #d5e0ea';
+    div.style.borderRadius = '12px';
+    div.style.padding = '8px 10px';
+    div.style.boxShadow = '0 10px 24px rgba(15,35,58,.10)';
+    div.style.fontFamily = "'Noto Sans', sans-serif";
+    div.style.fontSize = '12px';
+    div.style.color = '#16324a';
+    div.innerHTML = `<b>CECORE</b><br><span style="color:#dc2626;font-size:18px;vertical-align:middle;">●</span> Centros de Coordinación Regional`;
+    return div;
+  };
+  legend.addTo(state.map);
+  state.cecoreLegend = legend;
+}
+
 
 
 function renderScopePreview(features, scope='municipio'){
@@ -15,6 +207,10 @@ function renderScopePreview(features, scope='municipio'){
       }
     }
   ).addTo(state.map);
+  if(scope==='estado'){
+    addCecoreLayerToMap();
+    addCecoreLegend();
+  }
   try{
     const bounds = state.scopePreviewLayer.getBounds();
     if(bounds.isValid()) state.map.fitBounds(bounds.pad(0.03));
@@ -109,6 +305,11 @@ function drawMap(){
     }
   ).addTo(state.map);
 
+  if(isEstadoScopeActive()){
+    addCecoreLayerToMap();
+    addCecoreLegend();
+  }
+
   if(state.vectors && state.vectors.length){
     state.vectorLayer=L.geoJSON(
       {type:'FeatureCollection',features:state.vectors},
@@ -148,15 +349,18 @@ function drawMap(){
   state.routes.forEach(r=>{
     if(!r.points.length) return;
     const ini=r.points[0], fin=r.points[r.points.length-1];
-    markers.push({type:'Feature',properties:{unidad:r.unidad,tipo:'INICIO'},geometry:{type:'Point',coordinates:[ini.lon,ini.lat]}});
-    markers.push({type:'Feature',properties:{unidad:r.unidad,tipo:'FIN'},geometry:{type:'Point',coordinates:[fin.lon,fin.lat]}});
+    const inicioTipo=ini.cecore ? 'CECORE INICIO' : 'INICIO';
+    const finTipo=fin.cecore ? 'CECORE FIN' : 'FIN';
+    markers.push({type:'Feature',properties:{unidad:r.unidad,tipo:inicioTipo,nombre:ini.nombre},geometry:{type:'Point',coordinates:[ini.lon,ini.lat]}});
+    markers.push({type:'Feature',properties:{unidad:r.unidad,tipo:finTipo,nombre:fin.nombre},geometry:{type:'Point',coordinates:[fin.lon,fin.lat]}});
   });
   state.markerLayer=L.geoJSON(
     {type:'FeatureCollection',features:markers},
-    {pointToLayer:(f,latlng)=>L.circleMarker(latlng,{radius:7,color:f.properties.tipo==='INICIO'?'#0f9d58':'#b45309',fillColor:f.properties.tipo==='INICIO'?'#0f9d58':'#b45309',fillOpacity:.85,weight:2}).bindTooltip(`${f.properties.tipo} - ${f.properties.unidad}`)}
+    {pointToLayer:(f,latlng)=>{ const isStart=String(f.properties.tipo).includes('INICIO'); const isCecore=String(f.properties.tipo).includes('CECORE'); const color=isCecore?'#2563eb':(isStart?'#0f9d58':'#b45309'); return L.circleMarker(latlng,{radius:isCecore?9:7,color,fillColor:color,fillOpacity:.85,weight:2}).bindTooltip(`${f.properties.tipo} - ${f.properties.unidad}`); }}
   ).addTo(state.map);
 
   const layers=[state.sectorLayer,state.hotspotLayer,state.routeLayer,state.markerLayer];
+  if(state.cecoreLayer) layers.push(state.cecoreLayer);
   if(state.vectorLayer) layers.push(state.vectorLayer);
   const all=L.featureGroup(layers);
   if(all.getLayers().length) state.map.fitBounds(all.getBounds().pad(0.05));
@@ -368,4 +572,16 @@ function renderVoronoiPanel(){
   const headers = ['Zona','Puesto','Cobertura km','Tiempo máx. min','Unidades sugeridas','Presupuesto zona'];
   const rows = state.staticPosts.map(p=>`<tr><td>${displayZoneName(p.zona)}</td><td>${p.post_id}</td><td>${p.coverage_km}</td><td>${p.eta_max_min}</td><td>${p.unidades_sugeridas}</td><td>Total: ${p.unidades_totales_zona} · Ruta: ${p.unidades_ruta} · Fijas disp.: ${p.unidades_disponibles_fijas}</td></tr>`).join('');
   table.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+
+// Ensure CECORE markers are rendered after every map redraw
+if(typeof drawMap === 'function' && !window.__cecoreDrawMapWrapped){
+  window.__cecoreDrawMapWrapped = true;
+  const __sirpeOriginalDrawMapForCecores = drawMap;
+  drawMap = function(){
+    const result = __sirpeOriginalDrawMapForCecores.apply(this, arguments);
+    setTimeout(()=>{ if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap(); }, 0);
+    return result;
+  };
 }
