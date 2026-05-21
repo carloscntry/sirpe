@@ -13,6 +13,7 @@ const ESTADO_CECORES = {
   'REGION 10': { nombre:'CECORE REGION 10', lat:18.479156, lon:-97.443413 },
   'REGION 11': { nombre:'CECORE REGION 11', lat:18.378164, lon:-97.273977 }
 };
+window.ESTADO_CECORES = ESTADO_CECORES;
 
 function getActiveScopeSafe(){
   return document.getElementById('scopeSelector')?.value || state?.currentScope || 'municipio';

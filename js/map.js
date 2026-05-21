@@ -587,21 +587,158 @@ if(typeof drawMap === 'function' && !window.__cecoreDrawMapWrapped){
 }
 
 
-window.forceRenderCecores = function(){
-  try{
-    if(typeof renderCecoresOnStateMap === 'function'){
-      renderCecoresOnStateMap();
-    }
-  }catch(e){
-    console.warn('CECORE render error', e);
-  }
-};
 
-setTimeout(()=>{
-  try{
-    if(typeof window.forceRenderCecores==='function'){
-      window.forceRenderCecores();
+// ================= CECORE AUTONOMOUS OVERLAY FIX =================
+(function(){
+  const CECORES_FALLBACK = {
+    "REGION 1": {nombre:"CECORE REGION 1", lat:20.168071, lon:-98.078960},
+    "REGION 2": {nombre:"CECORE REGION 2", lat:19.8616700, lon:-98.0169652},
+    "REGION 3": {nombre:"CECORE REGION 3", lat:19.826258, lon:-97.349342},
+    "REGION 4": {nombre:"CECORE REGION 4", lat:19.278831, lon:-98.446680},
+    "REGION 5": {nombre:"CECORE REGION 5", lat:19.03634600, lon:-98.19059700},
+    "REGION 6": {nombre:"CECORE REGION 6", lat:18.989700, lon:-97.905805},
+    "REGION 7": {nombre:"CECORE REGION 7", lat:19.009628, lon:-97.462171},
+    "REGION 8": {nombre:"CECORE REGION 8", lat:18.885057, lon:-98.499458},
+    "REGION 9": {nombre:"CECORE REGION 9", lat:18.233243, lon:-98.000000},
+    "REGION 10": {nombre:"CECORE REGION 10", lat:18.479156, lon:-97.443413},
+    "REGION 11": {nombre:"CECORE REGION 11", lat:18.378164, lon:-97.273977}
+  };
+
+  function currentScope(){
+    const selector = document.getElementById('scopeSelector');
+    return selector?.value || window.state?.currentScope || 'municipio';
+  }
+
+  function cecoreCatalog(){
+    return window.ESTADO_CECORES || CECORES_FALLBACK;
+  }
+
+  function ensureCecoreStyles(){
+    if(document.getElementById('sirpe-cecore-style')) return;
+    const st = document.createElement('style');
+    st.id = 'sirpe-cecore-style';
+    st.textContent = `
+      .sirpe-cecore-pin{
+        width:24px;height:24px;border-radius:50% 50% 50% 0;
+        background:#dc2626;border:3px solid #fff;
+        transform:rotate(-45deg);
+        box-shadow:0 6px 18px rgba(0,0,0,.35);
+        position:relative;
+      }
+      .sirpe-cecore-pin::after{
+        content:"";position:absolute;left:50%;top:50%;
+        width:8px;height:8px;border-radius:50%;
+        background:#fff;transform:translate(-50%,-50%);
+      }
+      .sirpe-cecore-label{
+        background:rgba(255,255,255,.96);
+        border:1px solid #d5e0ea;
+        color:#0f172a;
+        font-weight:800;
+        font-size:11px;
+        padding:3px 6px;
+        border-radius:8px;
+        box-shadow:0 4px 12px rgba(15,35,58,.16);
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function clearCecores(){
+    if(!window.state?.map) return;
+    if(window.state.cecoreLayer){
+      try{ window.state.map.removeLayer(window.state.cecoreLayer); }catch(e){}
+      window.state.cecoreLayer = null;
     }
-  }catch(e){}
-}, 500);
+    if(window.state.cecoreLabelLayer){
+      try{ window.state.map.removeLayer(window.state.cecoreLabelLayer); }catch(e){}
+      window.state.cecoreLabelLayer = null;
+    }
+  }
+
+  window.renderCecoresOnStateMap = function(){
+    try{
+      if(!window.L || !window.state || !window.state.map) return;
+      clearCecores();
+      if(currentScope() !== 'estado') return;
+
+      ensureCecoreStyles();
+
+      const pins = [];
+      const labels = [];
+      Object.entries(cecoreCatalog()).forEach(([region, c])=>{
+        const lat = Number(c.lat);
+        const lon = Number(c.lon);
+        if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        const marker = L.marker([lat, lon], {
+          zIndexOffset: 20000,
+          icon: L.divIcon({
+            className:'sirpe-cecore-icon',
+            html:'<div class="sirpe-cecore-pin"></div>',
+            iconSize:[30,30],
+            iconAnchor:[15,30],
+            popupAnchor:[0,-28]
+          })
+        }).bindPopup(`
+          <b>${c.nombre || ('CECORE ' + region)}</b><br>
+          Región: <b>${region}</b><br>
+          Latitud: ${lat.toFixed(6)}<br>
+          Longitud: ${lon.toFixed(6)}<br>
+          <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">Abrir en Google Maps</a>
+        `);
+        pins.push(marker);
+
+        const label = L.marker([lat, lon], {
+          interactive:false,
+          zIndexOffset: 19999,
+          icon: L.divIcon({
+            className:'sirpe-cecore-label',
+            html:`${region}`,
+            iconSize:null,
+            iconAnchor:[-10,35]
+          })
+        });
+        labels.push(label);
+      });
+
+      window.state.cecoreLayer = L.layerGroup(pins).addTo(window.state.map);
+      window.state.cecoreLabelLayer = L.layerGroup(labels).addTo(window.state.map);
+      console.info(`CECORE: ${pins.length} marcadores dibujados`);
+    }catch(e){
+      console.warn('No fue posible dibujar CECORE', e);
+    }
+  };
+
+  function scheduleCecores(){
+    setTimeout(()=>window.renderCecoresOnStateMap && window.renderCecoresOnStateMap(), 100);
+    setTimeout(()=>window.renderCecoresOnStateMap && window.renderCecoresOnStateMap(), 600);
+    setTimeout(()=>window.renderCecoresOnStateMap && window.renderCecoresOnStateMap(), 1500);
+  }
+
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const selector = document.getElementById('scopeSelector');
+    if(selector && !selector.dataset.cecoreAutonomousBound){
+      selector.dataset.cecoreAutonomousBound = '1';
+      selector.addEventListener('change', scheduleCecores);
+    }
+    scheduleCecores();
+  });
+
+  const oldDrawMap = window.drawMap;
+  if(typeof oldDrawMap === 'function' && !window.__cecoreAutonomousDrawWrapped){
+    window.__cecoreAutonomousDrawWrapped = true;
+    window.drawMap = function(){
+      const result = oldDrawMap.apply(this, arguments);
+      scheduleCecores();
+      return result;
+    };
+  }
+
+  setInterval(()=>{
+    if(currentScope()==='estado' && window.state?.map && !window.state.cecoreLayer){
+      window.renderCecoresOnStateMap();
+    }
+  }, 2500);
+})();
 

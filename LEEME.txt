@@ -1,5 +1,15 @@
-Reemplaza tu archivo frontend/js/auth-api.js por js/auth-api.js de este ZIP.
-Luego ejecuta en tu repo frontend:
+Reemplaza estos archivos dentro de frontend/js:
+- routing.js
+- state.js
+- heatmap-loader.js
+- ingesta.js
+- map.js
+
+No reemplaces auth-api.js.
+
+Después ejecuta:
 git add .
-git commit -m "fix: conectar frontend con backend render"
+git commit -m "fix: CECORE visible y rutas estatales"
 git push
+
+Luego abre GitHub Pages y presiona Ctrl+F5.

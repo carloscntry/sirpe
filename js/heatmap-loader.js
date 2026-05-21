@@ -919,20 +919,3 @@ setTimeout(()=>{
   }
   if(typeof window.renderCecoresOnStateMap==='function') window.renderCecoresOnStateMap();
 }, 300);
-
-
-setTimeout(()=>{
-  const scopeSelector = document.getElementById('scopeSelector');
-  if(scopeSelector){
-    scopeSelector.addEventListener('change', ()=>{
-      setTimeout(()=>{
-        try{
-          if(typeof window.forceRenderCecores==='function'){
-            window.forceRenderCecores();
-          }
-        }catch(e){}
-      }, 150);
-    });
-  }
-}, 800);
-
