@@ -15,7 +15,6 @@
   };
 
   let cecoreLayer = null;
-  let cecoreLabels = null;
   let cecoreLegend = null;
 
   function getState(){
@@ -60,11 +59,6 @@
       cecoreLayer = null;
     }
 
-    if(cecoreLabels){
-      try{ map.removeLayer(cecoreLabels); }catch(e){}
-      cecoreLabels = null;
-    }
-
     if(cecoreLegend){
       try{ map.removeControl(cecoreLegend); }catch(e){}
       cecoreLegend = null;
@@ -89,7 +83,7 @@
 
       div.innerHTML =
         '<b>Centro de Coordinación Regional</b><br>' +
-        '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span>' +
+        '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #7f1d1d;margin-right:6px;vertical-align:middle;"></span>' +
         'CECORE';
 
       return div;
@@ -109,7 +103,6 @@
     if(!isEstado()) return false;
 
     const circles = [];
-    const labels = [];
 
     Object.entries(CECORES).forEach(([region, c])=>{
 
@@ -119,7 +112,7 @@
       if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
       const circle = L.circleMarker([lat, lon], {
-        radius: 7,
+        radius: 5,
         color: "#7f1d1d",
         weight: 2,
         fillColor: "#dc2626",
@@ -134,35 +127,10 @@
         "Longitud: " + lon.toFixed(6)
       );
 
-      const label = L.marker([lat, lon], {
-        interactive:false,
-        zIndexOffset: 50000,
-        icon: L.divIcon({
-          className: "sirpe-cecore-label-final",
-          html:
-            '<div style="' +
-            'background:#fff;' +
-            'color:#7f1d1d;' +
-            'border:1px solid #fecaca;' +
-            'border-radius:8px;' +
-            'padding:2px 5px;' +
-            'font-size:10px;' +
-            'font-weight:800;' +
-            'box-shadow:0 3px 8px rgba(0,0,0,.18);' +
-            'white-space:nowrap;">' +
-            region +
-            "</div>",
-          iconSize: null,
-          iconAnchor: [-12, 22]
-        })
-      });
-
       circles.push(circle);
-      labels.push(label);
     });
 
     cecoreLayer = L.layerGroup(circles).addTo(map);
-    cecoreLabels = L.layerGroup(labels).addTo(map);
 
     addLegend(map);
 
